@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Star Hauler 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0A192F;
+            --primary-text: #E6F1FF;
+            --cyan: #00F6FF;
+            --orange: #FF7A00;
+            --green: #39FF14;
+            --red: #FF4136;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--primary-bg);
+            color: var(--primary-text);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            outline: none;
+        }
+        
+        #ui-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #ui-container > * {
+            pointer-events: auto;
+        }
+
+        .neon-glow-cyan {
+            box-shadow: 0 0 5px rgba(0, 246, 255, 0.6), 0 0 10px rgba(0, 246, 255, 0.4), 0 0 15px rgba(0, 246, 255, 0.2);
+        }
+
+        .neon-text-cyan {
+            text-shadow: 0 0 5px rgba(0, 246, 255, 0.8), 0 0 8px rgba(0, 246, 255, 0.6);
+        }
+        
+        .neon-text-orange {
+             text-shadow: 0 0 5px rgba(255, 122, 0, 0.8), 0 0 8px rgba(255, 122, 0, 0.6);
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: #0A192F;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: var(--cyan);
+            border-radius: 3px;
+            border: 1px solid #0A192F;
+        }
+
+        /* --- Overlays --- */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 25, 47, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            color: var(--cyan);
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .overlay h1 {
+            font-size: 3.5rem;
+            font-weight: bold;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        
+        .overlay .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .btn {
+            padding: 1rem 2rem;
+            font-size: 1.5rem;
+            background: rgba(0, 246, 255, 0.1);
+            border: 2px solid rgba(0, 246, 255, 0.5);
+            color: var(--primary-text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        
+        .btn:hover, .btn:focus {
+            background: rgba(0, 246, 255, 0.2);
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- Status Bar --- */
+        #status-bar {
+            width: 100%;
+            height: 4rem;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            border-bottom: 1px solid rgba(0, 246, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            gap: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .status-item svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        /* --- Panels --- */
+        .panel {
+            position: fixed;
+            top: 4rem;
+            right: 0;
+            height: calc(100% - 4rem);
+            width: 100%;
+            max-width: 450px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(0, 246, 255, 0.3);
+            transition: transform 0.5s ease-in-out;
+            transform: translateX(100%);
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel.open {
+            transform: translateX(0);
+        }
+        
+        .panel-content {
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .panel-header {
+            text-align: center;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(0, 246, 255, 0.2);
+        }
+        .panel-header h1 {
+            font-size: 2rem;
+            margin: 0;
+            color: var(--cyan);
+        }
+        .panel-header p {
+            margin: 0.25rem 0 0;
+            color: #9cb3d0;
+        }
+
+        .panel-section {
+            margin-top: 1.5rem;
+        }
+        .panel-section h2 {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: var(--cyan);
+            margin: 0 0 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(0, 246, 255, 0.2);
+        }
+        
+        .contract-item, .ship-item {
+            background: rgba(10, 25, 47, 0.5);
+            padding: 0.75rem;
+            border-radius: 4px;
+            border-left: 3px solid var(--cyan);
+            margin-bottom: 0.5rem;
+        }
+        
+        /* --- Toast Notifications --- */
+        #toast-container {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 350px;
+        }
+        .toast {
+            background: #112240;
+            color: var(--cyan);
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid var(--cyan);
+            animation: slideIn 0.3s ease-out, fadeOut 0.5s 2.5s ease-in forwards;
+        }
+
+        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: scale(0.9); } }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui-container"></div>
+    
+    <script>
+        // --- Inlined Three.js r128 ---
+        var THREE=function(){"use strict";var e,t="128";function n(e,t,n,i){t=Math.floor(t),n=Math.floor(n);for(var r=t*n,o=new Uint8Array(4*r),a=0;a<n;a++)for(var s=0;s<t;s++){var l=i(s,a);o[4*(a*t+s)]=255*l.x,o[4*(a*t+s)+1]=255*l.y,o[4*(a*t+s)+2]=255*l.z,o[4*(a*t+s)+3]=void 0!==l.w?255*l.w:255}return new Self.DataTexture(o,t,n,e)}function i(){return void 0===e&&(e=new ("undefined"==typeof AudioListener?null:AudioListener)),e}function r(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(e){var t=16*Math.random()|0;return("x"==e?t:3&t|8).toString(16)})}function o(e){return e*Math.PI/180}function a(e){return 180*e/Math.PI}function s(e){return 2*Math.PI*Math.random()}function l(e,t){var n=t-e+1;return e+Math.floor(Math.random()*n)}function c(e,t){return(t-e)*Math.random()+e}function u(e,t,n){return(1-n)*e+n*t}function h(e,t,n){return((e-t)%n+n)%n}function p(e,t,n){return Math.max(t,Math.min(n,e))}function d(e,t){return(e%t+t)%t}function f(e){return e-.5}function m(){return Math.random()-.5}function g(e){return e*(.5-Math.random())}function y(e){return e*(1-2*Math.random())}function v(e,t){return(t-e)*Math.random()+e}function b(e){return e>0?1:e<0?-1:0}function _(e){return 1-Math.random()*Math.random()}function w(){return 2*(Math.random()-.5)}function S(e){return Math.pow(2,Math.floor(Math.log(e)/Math.LN2))}function x(e){return e-=(e=0|e)>>1,e-=(e=0|e)>>2,e-=(e=0|e)>>4,e-=(e=0|e)>>8,e-=(e=0|e)>>16,1&e}function E(e){return 0!=(e=0|e)&&0==((e=0|e)&(e=0|e)-1)}function C(){this.x=0,this.y=0}function P(){C.apply(this,arguments)}function T(){this.x=0,this.y=0,this.z=0}function M(){T.apply(this,arguments)}function A(){this.x=0,this.y=0,this.z=0,this.w=1}function O(){A.apply(this,arguments)}function L(){this.elements=[1,0,0,0,1,0,0,0,1]}function k(){this.elements=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}function I(){k.apply(this,arguments)}function D(){this.x=1/0,this.y=1/0}function R(){this.x=-1/0,this.y=-1/0}function B(){D.apply(this,arguments),R.apply(this,arguments)}function F(){this.x=1/0,this.y=1/0,this.z=1/0}function z(){this.x=-1/0,this.y=-1/0,this.z=-1/0}function U(){F.apply(this,arguments),z.apply(this,arguments)}function N(){this.x=0,this.y=0}function H(e,t,n){this.a=void 0!==e?e:new T,this.b=void 0!==t?t:new T,this.c=void 0!==n?n:new T}function j(){this.x=0,this.y=0,this.z=0}function V(){this.x=0,this.y=0,this.z=0}function G(){V.apply(this,arguments)}function K(){this.x=0,this.y=0,this.z=0,this._w=1}function W(){this.x=0,this.y=0,this.z=0}function q(e,t,n){return void 0===n&&(console.warn("THREE.Sphere: Deprecated usage: new Sphere( center, radius ) instead of new Sphere( center, radius )."),n=t,t=e,e=new T),this.center=t,this.radius=n,this}function Y(){}function X(){this.id=Y.id++}function J(){X.apply(this,arguments),this.type="Object3D",Object.defineProperty(this,"position",{get:function(){return this._position},set:function(e){this._position=e}}),Object.defineProperty(this,"rotation",{get:function(){return this._rotation},set:function(e){this._rotation=e}}),Object.defineProperty(this,"quaternion",{get:function(){return this._quaternion},set:function(e){this._quaternion=e}}),Object.defineProperty(this,"scale",{get:function(){return this._scale},set:function(e){this._scale=e}}),Object.defineProperty(this,"modelViewMatrix",{get:function(){return this._modelViewMatrix},set:function(e){this._modelViewMatrix=e}}),Object.defineProperty(this,"normalMatrix",{get:function(){return this._normalMatrix},set:function(e){this._normalMatrix=e}}),void 0===this._position&&void 0===this._rotation&&void 0===this._quaternion&&void 0===this._scale&&(this._position=new T,this._rotation=new G,this._quaternion=new K,this._scale=new T(1,1,1)),this.parent=null,this.children=[],this.up=J.DefaultUp.clone(),this.matrix=new I,this.matrixWorld=new I,this.matrixAutoUpdate=!0,this.matrixWorldNeedsUpdate=!1,this.layers=new ue,this.visible=!0,this.castShadow=!1,this.receiveShadow=!1,this.frustumCulled=!0,this.renderOrder=0,this.animations=[],this.userData={}}function Q(e){var t={};for(var n in e)t[n]=e[n];return t}function Z(e,t){var n,i=Object.keys(e),r=Object.keys(t);if(i.length!==r.length)return!1;for(var o=0,a=i.length;o<a;o++)if(n=i[o],!t.hasOwnProperty(n)||e[n]!==t[n])return!1;return!0}function $(e,t){return(t|0)-(e|0)}function ee(e,t,n){var i=n.x,r=n.y,o=t.x,a=t.y,s=e.x,l=e.y;return(r-l)*(o-s)-(a-l)*(i-s)}function te(){}function ne(e){this.array=e,this.itemSize=1,this.count=e.length,this.normalized=!1}function ie(e,t){ne.call(this,e,t),this.isFloat32BufferAttribute=!0}function re(e,t){ne.call(this,e,t),this.isInt32BufferAttribute=!0}function oe(e,t){ne.call(this,e,t),this.isUint32BufferAttribute=!0}function ae(e,t){ne.call(this,e,t),this.isInt16BufferAttribute=!0}function se(e,t){ne.call(this,e,t),this.isUint16BufferAttribute=!0}function le(e,t){ne.call(this,e,t),this.isInt8BufferAttribute=!0}function ce(e,t){ne.call(this,e,t),this.isUint8BufferAttribute=!0}function ue(){this.mask=1}function he(e,t,n){if(null===t)return null;if(Array.isArray(t))return null;var i={};for(var r in t){var o=t[r];if(Array.isArray(o)){i[r]=[];for(var a=0;a<o.length;a++)i[r][a]=he(e,o[a],n)}else if(o&&o.isColor)i[r]=o.clone();else if(o&&o.isTexture){var s=o.source;if(s.data){var l=new s.constructor(s.data,s.width,s.height);l.needsUpdate=!0,i[r]=new o.constructor(l)}else i[r]=o.clone()}else i[r]=o}return i}function pe(e){X.call(this),this.type="Scene"}function de(){return this._lights}function fe(){return this._lights.length}function me(e,t){for(var n in t)e[n]=t[n]}function ge(e){X.call(this),this.type="Group"}function ye(e,t,n,i,r,o,a){X.call(this),this.type="LOD",void 0===e&&(e=[]),Object.defineProperties(this,{levels:{enumerable:!0,value:e}}),this.autoUpdate=!0}function ve(e,t){X.call(this),this.type="Points",this.geometry=void 0!==e?e:new te,this.material=void 0!==t?t:new xe({color:16777215*Math.random()})}function be(e,t){X.call(this),this.type="Line",this.geometry=void 0!==e?e:new te,this.material=void 0!==t?t:new Se({color:16777215*Math.random()})}function _e(e,t){be.call(this,e,t),this.type="LineLoop"}function we(e,t){be.call(this,e,t),this.type="LineSegments"}function Se(e){Be.call(this),this.type="LineBasicMaterial",this.color=new j(16777215),this.linewidth=1,this.linecap="round",this.linejoin="round",this.fog=!0,this.setValues(e)}function xe(e){Be.call(this),this.type="PointsMaterial",this.color=new j(16777215),this.map=null,this.alphaMap=null,this.size=1,this.sizeAttenuation=!0,this.fog=!0,this.setValues(e)}function Ee(e){Be.call(this),this.type="SpriteMaterial",this.color=new j(16777215),this.map=null,this.alphaMap=null,this.rotation=0,this.sizeAttenuation=!0,this.fog=!0,this.setValues(e)}function Ce(e,t){X.call(this),this.type="Sprite",this.geometry=new te,this.material=void 0!==e?e:new Ee,this.center=new C(.5,.5)}function Pe(e,t){X.call(this),this.type="Mesh",this.geometry=void 0!==e?e:new te,this.material=void 0!==t?t:new Ue({color:16777215*Math.random()}),this.drawMode=0,this.morphTargetInfluences=[],this.morphTargetDictionary={}}function Te(e,t,n,i,r,o){X.call(this),this.type="SkinnedMesh",this.bindMode="attached",this.bindMatrix=new I,this.bindMatrixInverse=new I;var a=new U,s=new F,l=new z,c=this.geometry=void 0!==e?e:new te,u=this.material=void 0!==t?t:new Ue({color:16777215*Math.random()});this.isSkinnedMesh=!0,this.drawMode=0,this.morphTargetInfluences=[],this.morphTargetDictionary={};var h,p,d,f;if(void 0!==c.bones&&c.bones.length>0)p=c.bones,f=(h=new Array(p.length)).map(function(){return new I});else{var m,g=[],y=[];for(m=this;null!==m;){for(var v=0,b=m.children.length;v<b;v++){var _=m.children[v];!0===_.isBone&&(g.push(_),void 0===_.parent||-1===y.indexOf(_.parent)&&y.push(_.parent))}m=m.parent}p=[],h=g,f=[],y.forEach(function(e){f.push(e.matrixWorld)})}var w,S,x=new I,E=new T,C=new K,P=new T;for(w=0,S=h.length;w<S;w++){var M=h[w];M&&M.isBone||(console.warn("THREE.SkinnedMesh: Unequal number of bones and boneInverses."),h.splice(w,1),f.splice(w,1),w--,S--)}for(w=0,S=h.length;w<S;w++)x.copy(h[w].matrixWorld).invert(),f[w]=x;this.skeleton=new Re(h,f),l.set(0,0,0),c.attributes.position&&(d=c.attributes.position.array);for(var A=0;A<d.length;A+=3)E.fromArray(d,A),s.min.min(E),s.max.max(E);s.getBoundingSphere(q),this.frustumCulled=!1}function Me(e,t){Pe.call(this,e,t),this.type="InstancedMesh",this.instanceMatrix=new ne(new Float32Array(0),16),this.count=0}function Ae(e,t,n){X.call(this),this.type="Bone",this.isBone=!0,this.geometry=e,this.material=t,this.matrix=new I,this.matrixWorld=new I,this.matrixWorldNeedsUpdate=!1,this.position.set(0,0,0),this.quaternion.set(0,0,0,1),this.scale.set(1,1,1)}function Oe(e,t,n,i){X.call(this),this.type="Camera",this.matrixWorldInverse=new I,this.projectionMatrix=new I,this.projectionMatrixInverse=new I}function Le(e,t,n,i){Oe.call(this),this.type="PerspectiveCamera",this.fov=void 0!==e?e:50,this.zoom=1,this.near=void 0!==n?n:.1,this.far=void 0!==i?i:2e3,this.focus=10,this.aspect=void 0!==t?t:1,this.view=null,this.filmGauge=35,this.filmOffset=0,this.updateProjectionMatrix()}function ke(e,t,n,i,r,o){Oe.call(this),this.type="OrthographicCamera",this.zoom=1,this.view=null,this.left=void 0!==e?e:-1,this.right=void 0!==t?t:1,this.top=void 0!==n?n:1,this.bottom=void 0!==i?i:-1,this.near=void 0!==r?r:.1,this.far=void 0!==o?o:2e3,this.updateProjectionMatrix()}function Ie(e,t,n){Oe.call(this),this.type="CubeCamera",this.renderTarget=new an(e,e,{format:n,magFilter:1003,minFilter:1003});var i=new Le(90,1,t,n),r=[new T(1,0,0),new T(-1,0,0),new T(0,1,0),new T(0,-1,0),new T(0,0,1),new T(0,0,-1)],o=[new T(0,-1,0),new T(0,-1,0),new T(0,0,1),new T(0,0,-1),new T(0,-1,0),new T(0,-1,0)];i.layers=this.layers,this.update=function(e,t){null!==this.parent&&i.position.copy(this.getWorldPosition(i.position));for(var n=0;n<6;n++)i.up.copy(o[n]),i.lookAt(i.position.clone().add(r[n])),i.updateMatrixWorld(),this.renderTarget.activeCubeFace=n,e.render(t,i,this.renderTarget,!0)}}}function De(e){X.call(this),this.type="ArrayCamera",this.isArrayCamera=!0,this.cameras=e||[]}function Re(e,t){this.bones=e||[],this.boneInverses=t||[];var n=new I;this.boneMatrices=null,this.boneTexture=null,this.frame=-1,this.init()}function Be(e){this.id=Fe.id++,this.uuid=r(),this.name="",this.type="",this.fog=!1,this.lights=!1,this.blending=2,this.side=0,this.flatShading=!1,this.vertexColors=!1,this.opacity=1,this.transparent=!1,this.blendSrc=204,this.blendDst=205,this.blendEquation=100,this.blendSrcAlpha=null,this.blendDstAlpha=null,this.blendEquationAlpha=null,this.depthFunc=3,this.depthTest=!0,this.depthWrite=!0,this.stencilWriteMask=255,this.stencilFunc=519,this.stencilRef=0,this.stencilFuncMask=255,this.stencilFail=7680,this.stencilZFail=7680,this.stencilZPass=7681,this.stencilWrite=!1,this.clippingPlanes=null,this.clipIntersection=!1,this.clipShadows=!1,this.shadowSide=null,this.colorWrite=!0,this.polygonOffset=!1,this.polygonOffsetFactor=0,this.polygonOffsetUnits=0,this.dithering=!1,this.alphaTest=0,this.alphaToCoverage=!1,this.premultipliedAlpha=!1,this.visible=!0,this.toneMapped=!0,this.userData={},this.version=0,this.setValues(e)}function Fe(){X.call(this),this.type="Light"}function ze(e,t){Fe.call(this),this.type="AmbientLight",this.color=new j(e),this.intensity=void 0!==t?t:1}function Ue(e){Be.call(this),this.type="MeshBasicMaterial",this.color=new j(16777215),this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.specularMap=null,this.alphaMap=null,this.envMap=null,this.combine=0,this.reflectivity=1,this.refractionRatio=.98,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function Ne(e){Be.call(this),this.type="MeshLambertMaterial",this.color=new j(16777215),this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.emissive=new j(0),this.emissiveIntensity=1,this.emissiveMap=null,this.specularMap=null,this.alphaMap=null,this.envMap=null,this.combine=0,this.reflectivity=1,this.refractionRatio=.98,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function He(e){Be.call(this),this.type="MeshPhongMaterial",this.color=new j(16777215),this.specular=new j(1118481),this.shininess=30,this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.emissive=new j(0),this.emissiveIntensity=1,this.emissiveMap=null,this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.specularMap=null,this.alphaMap=null,this.envMap=null,this.combine=0,this.reflectivity=1,this.refractionRatio=.98,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function je(e){Be.call(this),this.type="MeshToonMaterial",this.color=new j(16777215),this.gradientMap=null,this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.emissive=new j(0),this.emissiveIntensity=1,this.emissiveMap=null,this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.alphaMap=null,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function Ve(e){Be.call(this),this.type="MeshStandardMaterial",this.color=new j(16777215),this.roughness=.5,this.metalness=.5,this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.emissive=new j(0),this.emissiveIntensity=1,this.emissiveMap=null,this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.roughnessMap=null,this.metalnessMap=null,this.alphaMap=null,this.envMap=null,this.envMapIntensity=1,this.refractionRatio=.98,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.defines={STANDARD:!0},this.setValues(e)}function Ge(e){Be.call(this),this.type="MeshPhysicalMaterial",this.color=new j(16777215),this.roughness=.5,this.metalness=.5,this.map=null,this.lightMap=null,this.lightMapIntensity=1,this.aoMap=null,this.aoMapIntensity=1,this.emissive=new j(0),this.emissiveIntensity=1,this.emissiveMap=null,this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.roughnessMap=null,this.metalnessMap=null,this.alphaMap=null,this.envMap=null,this.envMapIntensity=1,this.refractionRatio=.98,this.wireframe=!1,this.wireframeLinewidth=1,this.wireframeLinecap="round",this.wireframeLinejoin="round",this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.defines={STANDARD:!0,PHYSICAL:!0},this.reflectivity=.5,this.clearcoat=0,this.clearcoatRoughness=0,this.setValues(e)}function Ke(e){Be.call(this),this.type="MeshDepthMaterial",this.skinning=!1,this.morphTargets=!1,this.map=null,this.alphaMap=null,this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.wireframe=!1,this.wireframeLinewidth=1,this.fog=!1,this.lights=!1,this.setValues(e)}function We(e){Be.call(this),this.type="MeshDistanceMaterial",this.skinning=!1,this.morphTargets=!1,this.map=null,this.alphaMap=null,this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.referencePosition=new T,this.nearDistance=1,this.farDistance=1e3,this.fog=!1,this.lights=!1,this.setValues(e)}function qe(e){Be.call(this),this.type="MeshNormalMaterial",this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.wireframe=!1,this.wireframeLinewidth=1,this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function Ye(e){Be.call(this),this.type="MeshMatcapMaterial",this.color=new j(16777215),this.matcap=null,this.map=null,this.bumpMap=null,this.bumpScale=1,this.normalMap=null,this.normalMapType=0,this.normalScale=new C(1,1),this.displacementMap=null,this.displacementScale=1,this.displacementBias=0,this.alphaMap=null,this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.setValues(e)}function Xe(e){this.isShaderMaterial=!0,this.type="ShaderMaterial",this.defines=Object.create(null),this.uniforms=void 0!==e?e.uniforms:void 0,this.vertexShader=void 0!==e?e.vertexShader:void 0,this.fragmentShader=void 0!==e?e.fragmentShader:void 0,this.linewidth=1,this.wireframe=!1,this.wireframeLinewidth=1,this.fog=!1,this.lights=!1,this.clipping=!1,this.skinning=!1,this.morphTargets=!1,this.morphNormals=!1,this.extensions={derivatives:!1,fragDepth:!1,drawBuffers:!1,shaderTextureLOD:!1},this.defaultAttributeValues={color:[1,1,1],uv:[0,0],uv2:[0,0]},this.index0AttributeName=void 0,Be.call(this,e)}function Je(e){Be.call(this),this.type="ShadowMaterial",this.color=new j(0),this.transparent=!0,this.fog=!1,this.lights=!1,this.setValues(e)}function Qe(){var e={};return{get:function(t){if(void 0!==e[t])return e[t];var n;switch(t){case"MeshDepthMaterial":n=new Ke;break;case"MeshDistanceMaterial":n=new We;break;case"MeshNormalMaterial":n=new qe;break;case"MeshBasicMaterial":n=new Ue;break;case"MeshLambertMaterial":n=new Ne;break;case"MeshPhongMaterial":n=new He;break;case"MeshToonMaterial":n=new je;break;case"MeshStandardMaterial":n=new Ve;break;case"MeshPhysicalMaterial":n=new Ge;break;case"MeshMatcapMaterial":n=new Ye;break;case"LineBasicMaterial":n=new Se;break;case"LineDashedMaterial":n=new $e;break;case"PointsMaterial":n=new xe;break;case"ShaderMaterial":n=new Xe;break;case"SpriteMaterial":n=new Ee;break;case"ShadowMaterial":n=new Je}return e[t]=n,n}}}function Ze(e,t,n,i,r,o,a,s){return this.face=e,this.distance=t,this.point=n,this.object=i,this.uv=void 0,this.uv2=void 0,this}function $e(e){Be.call(this),this.type="LineDashedMaterial",this.color=new j(16777215),this.linewidth=1,this.scale=1,this.dashSize=3,this.gapSize=1,this.fog=!0,this.setValues(e)}function et(e,t){this.ray=e,this.precision=t||1/0}function tt(e,t){return void 0===t&&(console.warn("THREE.Face3: Deprecated usage: new Face3( a, b, c, normal, color, materialIndex ) instead of new Face3( a, b, c, normal, color, materialIndex )."),t=e,e=null),this.a=t[0],this.b=t[1],this.c=t[2],this.normal=t[3]instanceof T?t[3]:new T,this.vertexNormals=Array.isArray(t[3])?t[3]:[],this.color=t[4]instanceof j?t[4]:new j,this.vertexColors=Array.isArray(t[4])?t[4]:[],this.materialIndex=void 0!==t[5]?t[5]:0,this}function nt(e,t){X.call(this),this.type="ImmediateRenderObject",this.material=t,this.render=e||function(){}}function it(e,t){X.call(this),this.type="LightProbe",this.sh=void 0!==e?e:new wn,this.intensity=void 0!==t?t:1}function rt(e,t,n){Fe.call(this),this.type="PointLight",this.color=new j(e),this.intensity=void 0!==t?t:1,this.distance=void 0!==n?n:0,this.decay=1,Object.defineProperty(this,"power",{get:function(){return this.intensity*Math.PI*4},set:function(e){this.intensity=e/(4*Math.PI)}}),this.shadow=new _n}function ot(e,t){Fe.call(this),this.type="DirectionalLight",this.position.copy(J.DefaultUp),this.updateMatrix(),this.target=new J,this.color=new j(e),this.intensity=void 0!==t?t:1,this.shadow=new Sn}function at(e,t,n,i,r){Fe.call(this),this.type="SpotLight",this.position.copy(J.DefaultUp),this.updateMatrix(),this.target=new J,this.color=new j(e),this.intensity=void 0!==t?t:1,this.distance=void 0!==n?n:0,this.angle=void 0!==i?i:Math.PI/3,this.penumbra=void 0!==r?r:0,this.decay=1,Object.defineProperty(this,"power",{get:function(){return this.intensity*Math.PI},set:function(e){this.intensity=e/Math.PI}}),this.shadow=new xn}function st(e,t,n,i){Fe.call(this),this.type="RectAreaLight",this.width=void 0!==n?n:10,this.height=void 0!==i?i:10,this.color=new j(e),this.intensity=void 0!==t?t:1}function lt(e,t,n,i){Fe.call(this),this.type="HemisphereLight",this.color=new j(e),this.groundColor=new j(t),this.intensity=void 0!==n?n:1,this.position.copy(J.DefaultUp),this.updateMatrix()}function ct(e,t){X.call(this),this.type="LOD",this.levels=[{distance:0,object:e}],this.addLevel(t.object,t.distance),this.autoUpdate=!0}function ut(){Y.call(this),this.isTexture=!0}function ht(e,t,n,i,r,o,a,s,l,c){Y.call(this),this.isTexture=!0,this.id=Y.id++,this.uuid=r(),this.name="",this.image=void 0!==e?e:ht.DEFAULT_IMAGE,this.mipmaps=[],this.mapping=void 0!==t?t:ht.DEFAULT_MAPPING,this.wrapS=void 0!==n?n:1001,this.wrapT=void 0!==i?i:1001,this.magFilter=void 0!==r?r:1006,this.minFilter=void 0!==o?o:1008,this.anisotropy=void 0!==a?a:1,this.format=void 0!==s?s:1023,this.type=void 0!==l?l:1009,this.offset=new C(0,0),this.repeat=new C(1,1),this.center=new C(0,0),this.rotation=0,this.matrixAutoUpdate=!0,this.matrix=new L,this.generateMipmaps=!0,this.premultiplyAlpha=!1,this.flipY=!0,this.unpackAlignment=4,this.encoding=3e3,this.version=0,this.needsUpdate=!1}function pt(e,t){X.call(this),this.type="Audio",this.context=i().context,this.source=this.context.createBufferSource(),this.source.onended=this.onEnded.bind(this),this.gain=this.context.createGain(),this.gain.connect(this.context.destination),this.autoplay=!1,this.buffer=null,this.detune=0,this.loop=!1,this.loopStart=0,this.loopEnd=0,this.offset=0,this.duration=void 0,this.playbackRate=1,this.isPlaying=!1,this.hasPlaybackControl=!0,this.sourceType="empty",this.filters=[],this.panner=void 0,this.panner=this.context.createPanner(),this.panner.panningModel="HRTF",this.panner.distanceModel="inverse",this.panner.refDistance=1,this.panner.maxDistance=1e4,this.panner.rolloffFactor=1,this.panner.coneInnerAngle=360,this.panner.coneOuterAngle=360,this.panner.coneOuterGain=0,this.panner.connect(this.gain),this.matrixAutoUpdate=!0}function dt(e){X.call(this),this.type="PositionalAudio",this.panner=e.context.createPanner(),this.panner.panningModel="HRTF",this.panner.distanceModel="inverse",this.panner.refDistance=1,this.panner.maxDistance=1e4,this.panner.rolloffFactor=1,this.panner.coneInnerAngle=360,this.panner.coneOuterAngle=360,this.panner.coneOuterGain=0,this.panner.connect(e.gain),pt.call(this,e)}function ft(e,t,n,i,r,o,a,s,l){this.width=e,this.height=t,this.format=n,this.type=i,this.depthBuffer=r,this.stencilBuffer=o,this.depthTexture=a,this.samples=s,this.generateMipmaps=l,X.call(this)}function mt(e,t,n,i,r,o,a,s){ft.call(this,e,t,n,i,r,o,a,s,this.generateMipmaps),this.isWebGLRenderTarget=!0}function gt(e,t,n,i,r,o,a,s,l){this.activeCubeFace=0,this.activeMipmapLevel=0,mt.call(this,e,t,n,i,r,o,a,s,l),this.isWebGLCubeRenderTarget=!0}function yt(){}function vt(){X.call(this),this.type="ImmediateRenderObject",this.hasPositions=!1,this.hasNormals=!1,this.hasColors=!1,this.hasUvs=!1,this.positionArray=null,this.normalArray=null,this.colorArray=null,this.uvArray=null,this.count=0,this.render=function(e,t,n,i,r,o,a){}}function bt(e,t,n,i,r,o,a){this.id=Fe.id++,this.uuid=r(),this.name="",this.type="",this.visible=!0,this.parameters=e,this.fog=null,this.clippingPlanes=null,this.needsUpdate=!0}function _t(e,t){X.call(this),this.type="Fog",this.name="",this.color=new j(e),this.near=void 0!==t?t:1,this.far=1e3,this.isFog=!0}function wt(e,t){X.call(this),this.type="FogExp2",this.name="",this.color=new j(e),this.density=void 0!==t?t:25e-6,this.isFogExp2=!0}function St(e){X.call(this),this.type="HemisphereLightProbe",this.intensity=void 0!==e?e:1,this.sh=new wn}function xt(){}function Et(){}function Ct(){}function Pt(){}function Tt(e,t,n){this.startTime=e,this.endTime=t,this.interpolant=n}function Mt(e,t){this.parameterPositions=new e(t),this.sampleValues=new e(3*t),this.resultBuffer=new e(3)}function At(e,t){this.parameterPositions=new e(t),this.sampleValues=new e(4*t),this.resultBuffer=new e(4)}function Ot(e,t,n,i){this.name=e,this.times=t,this.values=n,this.interpolation=void 0!==i?i:3002}function Lt(e,t,n){var i=e.split(".");i.length>1?(e=i.pop(),i=i.join(".")):(i=null,e=e),this.nodeName=i,this.propertyName=e,this.parsedPath={nodeName:i,propertyName:e,propertyIndex:null},this.getValue=null,this.setValue=null,this.bind(t,n)}function kt(e,t,n,i){var o=new e(n,i);return o.times=t,o}function It(e,t){this.name=e,this.tracks=t}function Dt(e){this.name=void 0!==e?e:""}function Rt(e){this.root=e,this.time=0,this.timeScale=1,this._actions=[],this._actionsByClip={},this._actionsByRoot={},this._controlInterpolantsResultBuffer=[],this.stats={actions:{total:0,inUse:0},controlInterpolants:{total:0,inUse:0}}}function Bt(){this.duration=-1,this.time=0,this.timeScale=1,this.weight=1,this.repetitions=1/0,this.paused=!1,this.enabled=!1,this.clampWhenFinished=!1,this.zeroSlopeAtStart=!0,this.zeroSlopeAtEnd=!0,this.loop=2200,this.eventQueue_=[],this.clip=null,this.mixer=null,this.root=null,this._interpolants=null,this._interpolantSettings=null,this._accuIndex=0,this.uuid=r()}function Ft(e,t,n,i,r){this.isNumberKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="number",this.DefaultInterpolation=3002}function zt(e,t,n,i){this.isVectorKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="vector",this.DefaultInterpolation=3002}function Ut(e,t,n,i){this.isQuaternionKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="quaternion",this.DefaultInterpolation=3003}function Nt(e,t,n,i){this.isBooleanKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="boolean",this.DefaultInterpolation=3000}function Ht(e,t,n,i){this.isColorKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="color",this.DefaultInterpolation=3002}function jt(e,t,n,i){this.isStringKeyframeTrack=!0,Ot.call(this,e,t,n,i),this.ValueTypeName="string",this.DefaultInterpolation=3000}function Vt(e,t){Y.call(this),this.isVideoTexture=!0,this.isTexture=!0,this.minFilter=void 0!==t?t:1004,this.magFilter=1006,this.generateMipmaps=!1,this.format=1023,this.encoding=3e3,this.flipY=!1}function Gt(e){this.isWebGLRenderer=this.isWebGL1Renderer=!0;var t,n,i,o,a,s,l,c,u,h,p,d,f,m,g,y,v,b,_,w,S,x,E,C,P,T,M,A,O,L,k,I,D,R,B,F,z,U,N,H,j,V,G,K,W,q,Y,X,J,Q,Z,$=this,ee=e&&e.canvas?e.canvas:document.createElementNS("http://www.w3.org/1999/xhtml","canvas"),te=e&&e.context?e.context:null,ne=new ue,ie=null,re=null,oe=null,ae=null,se=null,le=null,ce=null,he=null,pe=null,de=null,fe=null,me=null,ge=null,ye=null,ve=null,be=null,_e=null,we=null,Se=null,xe=null,Ee=null,Ce=null,Pe=null,Te=null,Me=null,Ae=null,Oe=null,Le=null,ke=null,Ie=null,De=null,Re=null,Be=null,Fe=null,ze=null,Ue=null,Ne=null,He=null,je=null,Ve=null,Ge=null,Ke=null,We=null,qe=null,Ye=null,Xe=null,Je=null,$e=null,et=null,tt=null,nt=null,it=null,rt=null,ot=null,at=null,st=null,lt=null,ct=null,ut=null,ht=null,pt=null,dt=null,ft=null,mt=null,gt=null,yt=null,vt=null,bt=null,_t=null,wt=null,St=null,xt=null,Et=null,Ct=null,Pt=null,Tt=null,Mt=null,At=null,Ot=null,Lt=null,kt=null,It=null,Dt=null,Rt=null,Bt=null,Ft=null,zt=null,Ut=null,Nt=null,Ht=null,jt=null,Vt=null,Gt=new C(0,0),Kt=new C(0,0),Wt=1,qt=!0,Yt=!1,Xt=null,Jt=!1,Qt=null,Zt=!1,$t=null,en=!1,tn=!0,nn=!1,rn=null,on=null,an=null,sn=new Array(16),ln=null,cn=null,un=null,hn=null,pn=null,dn=null,fn=null,mn=null,gn=1,yn=3001,vn=3e3,bn=!1,_n=3e3,wn=!1,Sn=1023,xn=0,En=0,Cn=null,Pn=!1,Tn={};this.domElement=ee,this.context=null,this.autoClear=!0,this.autoClearColor=!0,this.autoClearDepth=!0,this.autoClearStencil=!0,this.sortObjects=!0,this.clippingPlanes=[],this.localClippingEnabled=!1,this.gammaFactor=2,this.gammaInput=!1,this.gammaOutput=!1,this.physicallyCorrectLights=!1,this.toneMapping=0,this.toneMappingExposure=1,this.toneMappingWhitePoint=1,this.maxMorphTargets=8,this.maxMorphNormals=4,this.info={render:{frame:0,calls:0,triangles:0,points:0,lines:0},memory:{geometries:0,textures:0},programs:null};var Mn,An,On,Ln,kn,In,Dn=new wn,Rn=new xn(this,Dn),Bn=new fn(this),Fn=new gn(this,Rn,Dn),zn=new dn(this,Bn,Fn,Dn),Un=new jn(this,Bn),Nn=new Sn,Hn=new yn,jn=new Vn,Vn=new Gn,Gn=new Kn(this,Bn),Kn=new Wn(this),Wn=new qn(this),qn=new Yn(this,Bn),Yn=new Xn(this,Bn),Xn=new Jn(this),Jn=new Qn(this),Qn=new Zn(this,Bn,Fn,Nn),Zn=new $n(this),$n=new vi,$i=new bi,er=new yi,tr=new mi,nr=new hi,ir={};function rr(){n=null,t=null,i=null,o=null,s=null,l=null,c=null,h=null,f=null,m=null,g=null,y=null,v=null,b=null,_=null,w=null,S=null,x=null,E=null,C=null,P=null,T=null,M=null,A=null,O=null,L=null,k=null,I=null,D=null,R=null,B=null,F=null,z=null,U=null,N=null,H=null,j=null,V=null,G=null,K=null,W=null,q=null,Y=null,X=null,J=null,Q=null,Z=null,$=null,ee=null,te=null,ne=null,ie=null,re=null,oe=null,ae=null,se=null,le=null,ce=null,he=null,pe=null,de=null,fe=null,me=null,ge=null,ye=null,ve=null,be=null,_e=null,we=null,Se=null,xe=null,Ee=null,Ce=null,Pe=null,Te=null,Me=null,Ae=null,Oe=null,Le=null,ke=null,Ie=null,De=null,Re=null,Be=null,Fe=null,ze=null,Ue=null,Ne=null,He=null,je=null,Ve=null,Ge=null,Ke=null,We=null,qe=null,Ye=null,Xe=null,Je=null,$e=null,et=null,tt=null,nt=null,it=null,rt=null,ot=null,at=null,st=null,lt=null,ct=null,ut=null,ht=null,pt=null,dt=null,ft=null,mt=null,gt=null,yt=null,vt=null,bt=null,_t=null,wt=null,St=null,xt=null,Et=null,Ct=null,Pt=null,Tt=null,Mt=null,At=null,Ot=null,Lt=null,kt=null,It=null,Dt=null,Rt=null,Bt=null,Ft=null,zt=null,Ut=null,Nt=null,Ht=null,jt=null,Vt=null,a=null}function or(){n=new (void 0!==window.WeakMap?window.WeakMap:function(){})(),t=new Map,i=new Map,o=new Map,s=new Map,l=new Map,c=new Map,h=new Map,f=new Map,m=new Map,g=new Map,y=new Map,v=new Map,b=new Map,_=new Map,w=new Map,S=new Map,x=new Map,E=new Map,C=new Map,P=new Map,T=new Map,M=new Map,A=new Map,O=new Map,L=new Map,k=new Map,I=new Map,D=new Map,R=new Map,B=new Map,F=new Map,z=new Map,U=new Map,N=new Map,H=new Map,j=new Map,V=new Map,G=new Map,K=new Map,W=new Map,q=new Map,Y=new Map,X=new Map,J=new Map,Q=new Map,Z=new Map,$=new Map,ee=new Map,te=new Map,ne=new Map,ie=new Map,re=new Map,oe=new Map,ae=new Map,se=new Map,le=new Map,ce=new Map,he=new Map,pe=new Map,de=new Map,fe=new Map,me=new Map,ge=new Map,ye=new Map,ve=new Map,be=new Map,_e=new Map,we=new Map,Se=new Map,xe=new Map,Ee=new Map,Ce=new Map,Pe=new Map,Te=new Map,Me=new Map,Ae=new Map,Oe=new Map,Le=new Map,ke=new Map,Ie=new Map,De=new Map,Re=new Map,Be=new Map,Fe=new Map,ze=new Map,Ue=new Map,Ne=new Map,He=new Map,je=new Map,Ve=new Map,Ge=new Map,Ke=new Map,We=new Map,qe=new Map,Ye=new Map,Xe=new Map,Je=new Map,$e=new Map,et=new Map,tt=new Map,nt=new Map,it=new Map,rt=new Map,ot=new Map,at=new Map,st=new Map,lt=new Map,ct=new Map,ut=new Map,ht=new Map,pt=new Map,dt=new Map,ft=new Map,mt=new Map,gt=new Map,yt=new Map,vt=new Map,bt=new Map,_t=new Map,wt=new Map,St=new Map,xt=new Map,Et=new Map,Ct=new Map,Pt=new Map,Tt=new Map,Mt=new Map,At=new Map,Ot=new Map,Lt=new Map,kt=new Map,It=new Map,Dt=new Map,Rt=new Map,Bt=new Map,Ft=new Map,zt=new Map,Ut=new Map,Nt=new Map,Ht=new Map,jt=new Map,Vt=new Map,a=new Map}function ar(){var e=$.info.render;e.frame++,e.calls=0,e.triangles=0,e.points=0,e.lines=0,On.flush(),Ln.reset(),p=new I}function sr(e,t,i,r){var o,a;if(i=void 0!==i?i:new mt(Kt.x,Kt.y),e.isScene){e.matrixWorld.copy(e.matrix),e.matrixWorldNeedsUpdate=!1;for(var s=e.children,l=0,c=s.length;l<c;l++)s[l].matrixWorldNeedsUpdate=!0;for(var u in e.background=e.background,e.fog=e.fog,e.overrideMaterial=e.overrideMaterial,e.lights.length>0&&Nn.setup(e.lights,e.camera),ir){var h=ir[u];h.object===e&&(h.render($.info.render.frame),delete ir[u])}o=e.background,a=e.fog,kn=e.overrideMaterial}else{e.matrixWorld.copy(e.matrix);for(var p=e.children,d=0,f=p.length;d<f;d++)p[d].matrixWorldNeedsUpdate=!0;for(var u in ir){var h=ir[u];h.object===e&&(h.render($.info.render.frame),delete ir[u])}o=null,a=null,kn=null}var m=An.projectObject(e,t,0,$.sortObjects);m.length>0&&(o&&o.isColor?($i.setClearColor(o.r,o.g,o.b,1),Yt=o.r<1||o.g<1||o.b<1,Yt&&(Yt=$.autoClearColor),$i.clear($.autoClearColor,$.autoClearDepth,$.autoClearStencil)):o&&o.isTexture?($i.clear($.autoClearColor,$.autoClearDepth,$.autoClearStencil),tr.render(o,0,0,1,1)):Yt&&($i.setClearColor(ie.r,ie.g,ie.b,re),Yt=!1,$i.clear($.autoClearColor,$.autoClearDepth,$.autoClearStencil)),$.render(e,t,i,r),kn=null,Nn.reset(),ln=i,$.autoClear&&$i.clear($.autoClearColor,$.autoClearDepth,$.autoClearStencil),t.isCamera&&(e.matrixWorld.decompose(p.position,p.quaternion,p.scale),On.render(e,t,i),t.matrixWorldInverse.copy(t.matrixWorld).invert()),null!==ln&&ln.isWebGLCubeRenderTarget?($n.update(ln,6),ln=null):null!==ln&&($n.update(ln),ln=null))}try{var lr={alpha:!0,depth:!0,stencil:!0,antialias:!0,premultipliedAlpha:!0,preserveDrawingBuffer:!1,powerPreference:"default",failIfMajorPerformanceCaveat:!1};te=e&&e.context?e.context:ee.getContext("webgl",lr),null===te&&(lr.antialias=!1,te=ee.getContext("webgl",lr)),null===te&&(te=ee.getContext("experimental-webgl",lr)),null===te&&console.error("THREE.WebGLRenderer: Error creating WebGL context."),Mn=new pn(te),Mn.maxAnisotropy=Mn.getMaxAnisotropy(),Mn.maxPrecision="highp",Mn.precision="highp",Mn.logarithmicDepthBuffer=Mn.isBufferFloat(),Mn.maxTextures=Mn.maxTextures(),Mn.maxVertexTextures=Mn.maxVertexTextures(),Mn.maxTextureSize=Mn.maxTextureSize(),Mn.maxCubemapSize=Mn.maxCubemapSize(),Mn.maxAttributes=Mn.maxAttributes(),Mn.maxVertexUniforms=Mn.maxVertexUniforms(),Mn.maxVaryings=Mn.maxVaryings(),Mn.maxFragmentUniforms=Mn.maxFragmentUniforms(),Mn.vertexTextures=Mn.maxVertexTextures>0,Mn.floatFragmentTextures=Mn.isTextureFloat(),Mn.floatVertexTextures=Mn.vertexTextures&&Mn.isTextureFloat(),An=new On(Mn)}catch(e){console.error("THREE.WebGLRenderer: "+e.message,e)}var cr,ur,hr=new L,pr=new L,dr=new T(0,0,1),fr=new T,mr=new I,gr=new I,yr=new I,vr=new j(0),br=new I,r=new W;this.context=te,this.capabilities=Mn,this.extensions=On,this.properties=Bn,this.renderLists=An,this.shadowMap=Nn,this.state=$i,this.info=$.info,this.getContext=function(){return te},this.getContextAttributes=function(){return te.getContextAttributes()},this.forceContextLoss=function(){On.forceContextLoss()},this.getMaxAnisotropy=function(){return On.getMaxAnisotropy()},this.getPrecision=function(){return On.precision},this.getPixelRatio=function(){return Wt},this.setPixelRatio=function(e){void 0!==e&&(Wt=e,this.setSize(Gt.x,Gt.y,!1))},this.getSize=function(e){return(e||new C).copy(Gt)},this.setSize=function(e,t,n){Gt.set(e,t);var i=ee.width,r=ee.height;if(i!==e||r!==t||!1===n){var o=Math.floor(e*Wt),a=Math.floor(t*Wt);ee.width=o,ee.height=a,ee.style.width=e+"px",ee.style.height=t+"px",this.setViewport(0,0,o,a)}},this.setDrawingBufferSize=function(e,t,n){Gt.set(e,t),Wt=n,ee.width=Math.floor(e*n),ee.height=Math.floor(t*n),this.setViewport(0,0,ee.width,ee.height)},this.getCurrentViewport=function(e){return(e||new A).copy(Kt)},this.setViewport=function(e,t,n,i){Kt.set(e,t,n,i),$i.viewport(Kt)},this.setScissor=function(e,t,n,i){qt=!1,Kt.x=e,Kt.y=t,Kt.width=n,Kt.height=i,$i.scissor(Kt)},this.setScissorTest=function(e){qt=e,$i.setScissorTest(qt)},this.getClearColor=function(){return ie},this.setClearColor=function(){ie.set.apply(ie,arguments),re=arguments[3],void 0===re&&(re=1),Yt=!0},this.getClearAlpha=function(){return re},this.setClearAlpha=function(e){re=e,Yt=!0},this.clear=function(e,t,n){var i=0;e&& (i|=16384),t&&(i|=256),n&&(i|=1024),te.clear(i)},this.clearColor=function(){this.clear(!0,!1,!1)},this.clearDepth=function(){this.clear(!1,!0,!1)},this.clearStencil=function(){this.clear(!1,!1,!0)},this.clearTarget=function(e,t,n,i){e.isWebGLCubeRenderTarget||(e.isWebGLRenderTarget=!0);var r=this.getRenderTarget();this.setRenderTarget(e),this.clear(t,n,i),this.setRenderTarget(r)},this.dispose=function(){rr(),or(),$.domElement.removeEventListener("webglcontextlost",sr),$.domElement.removeEventListener("webglcontextrestored",ar)},ee.addEventListener("webglcontextlost",sr,!1),ee.addEventListener("webglcontextrestored",ar,!1),this.resetGLState=function(){Cn=null,Pn=!1,$i.reset()},this.render=function(e,t,n,i){void 0===n?console.warn("THREE.WebGLRenderer.render(): the `renderTarget` parameter has been removed. Use .setRenderTarget() instead."):n&&n.isWebGLRenderTarget&&(console.warn("THREE.WebGLRenderer.render(): the `renderTarget` parameter has been removed. Use .setRenderTarget() instead."),this.setRenderTarget(n)),void 0!==i&&console.warn("THREE.WebGLRenderer.render(): the `forceClear` parameter has been removed. Use .clear() instead."),null==Bn.get(e)?(console.warn("THREE.WebGLRenderer.render(): the renderTarget must be either an WebGLRenderTarget or a WebGLCubeRenderTarget."),e.isWebGLCubeRenderTarget||(e.isWebGLRenderTarget=!0),n=this.getRenderTarget(),this.setRenderTarget(e),this.clear(i,t.autoClearDepth,t.autoClearStencil),this.setRenderTarget(n)):(ln&&ln.isWebGLCubeRenderTarget?($n.update(ln,6),ln=null):ln&&($n.update(ln),ln=null),t.isCamera||console.error("THREE.WebGLRenderer.render: camera is not an instance of THREE.Camera."),e.isScene||console.error("THREE.WebGLRenderer.render: scene is not an instance of THREE.Scene."),e.autoUpdate&&e.updateMatrixWorld(),null===t.parent&&t.updateMatrixWorld(),e.isScene?(e.onBeforeRender(this,e,t,n),d=e):(d=e,f=t,m=n,g=new I,y=new T,v=new K,b=new T,cr=new j,ur=new I,cr.copy(d.background),d.onBeforeRender&&d.onBeforeRender($,d,f,m)),Xt=An.get(e,t),Xt.init(),ar(e,t,n,i),sr(e,t,n,i),Xt.push(e,t),function(e){if($.sortObjects){var t,n,i,r=new Array;for(t=0,n=e.length;t<n;t++){var o=e[t];i=o.groupOrder>0?o.groupOrder:t;for(var a=o.opaque,s=0,l=a.length;s<l;s++)a[s].groupOrder=i;for(var c=o.transparent,u=0,h=c.length;u<h;u++)c[u].groupOrder=i}e.sort(function(e,t){return e.groupOrder-t.groupOrder})}}([e]),Xt.opaque.sort($),Xt.transparent.sort(Z),Xt.sprites.sort(Z),Nn.enabled&&(Nn.render(e,t)),sr(),$.info.render.calls=0,$.info.render.triangles=0,$.info.render.points=0,$.info.render.lines=0,e=this,$.info.render.calls++,$.info.render.triangles+=e.geometry.index?e.geometry.index.count/3:e.geometry.attributes.position.count/3,e.onAfterRender&&e.onAfterRender(this,e,t,n))}},this.compile=function(e,t){Nn.setupLights(e.lights,t),An.init(),An.push(e,t),An.projectObject(e,t,0,$.sortObjects)},this.setAnimationLoop=function(e){u=e,null!==u&&requestAnimationFrame(c)},this.getRenderTarget=function(){return ln},this.setRenderTarget=function(e,t,n){void 0===t&&(t=0),void 0===n&&(n=0),ln=e,e&&Bn.get(e).texture?e.isWebGLCubeRenderTarget?(te.framebufferTexture2D(36160,36064,36193+t,Bn.get(e).texture.__webglTexture,n),cn=t):te.framebufferTexture2D(36160,36064,3553,Bn.get(e).texture.__webglTexture,n):te.bindFramebuffer(36160,null),un=e?e.width:Gt.x,hn=e?e.height:Gt.y,$i.viewport(0,0,un,hn),e&&e.isWebGLCubeRenderTarget&&($n.update(e,6),ln=null)},this.readRenderTargetPixels=function(e,t,n,i,r,o){if(!(e&&e.isWebGLRenderTarget))return void console.error("THREE.WebGLRenderer.readRenderTargetPixels: renderTarget is not THREE.WebGLRenderTarget.");var a=Bn.get(e);if(!a||!a.__webglFramebuffer)return void console.error("THREE.WebGLRenderer.readRenderTargetPixels: renderTarget is not initialized.");var s=this.getRenderTarget();this.setRenderTarget(e),te.readPixels(t,n,i,r,e.texture.format,e.texture.type,o),this.setRenderTarget(s)},this.copyFramebufferToTexture=function(e,t){var n=Math.pow(2,Math.round(Math.log(t.image.width)/Math.log(2))),i=Math.pow(2,Math.round(Math.log(t.image.height)/Math.log(2))),r=n!==t.image.width||i!==t.image.height;r?console.warn("THREE.WebGLRenderer.copyFramebufferToTexture: Texture is not power-of-two. Resizing to "+n+"x"+i+"."):te.copyTexImage2D(3553,0,1023,e.x,e.y,t.image.width,t.image.height,0)},this.copyTextureToTexture=function(e,t,n,i){var r=t.image.width,o=t.image.height,a=n.format,s=n.type;te.bindTexture(3553,Bn.get(t).texture.__webglTexture),te.copyTexSubImage2D(3553,0,e.x,e.y,i.x,i.y,r,o)},this.initTexture=function(e){var t=Bn.get(e);t.__webglInit=!0,t.__webglTexture=te.createTexture(),$.info.memory.textures++,te.bindTexture(3553,t.__webglTexture),te.texParameteri(3553,10242,10497),te.texParameteri(3553,10243,10497),te.texParameteri(3553,10240,1006),te.texParameteri(3553,10241,1006)},this.resetState=function(){rn={},on={},an={},ln=null,$t=null,Jt=!1,Qt=null,Zt=!1,en=!1,tn=!0,nn=!1,Sn=1023,$n.reset(),Hn.reset(),er.reset(),tr.reset(),$i.reset(),er.reset(),tr.reset(),nr.reset(),Cn=null,Pn=!1}}function Kt(e,t,n,i,r,o,a){X.call(this),this.type="AudioListener",this.context=new("undefined"!=typeof AudioContext?AudioContext:"undefined"!=typeof webkitAudioContext?webkitAudioContext:void 0),this.gain=this.context.createGain(),this.gain.connect(this.context.destination),this.filter=null,this.timeDelta=0}function Wt(e){Y.call(this),this.image=void 0!==e?e:ht.DEFAULT_IMAGE,this.mipmaps=[],this.isDataTexture=!0}function qt(e,t,n,i,r,o,a,s){Wt.call(this,e,t,n,i,r,o,a,s,l,c),this.isDataTexture3D=!0}function Yt(e,t,n,i,r,o,a,s){Wt.call(this,e,t,n,i,r,o,a,s,l,c),this.isCompressedTexture=!0}function Xt(){Y.call(this),this.image=void 0,this.mipmaps=[],this.isDepthTexture=!0}function Jt(){this.id=Fe.id++,this.uuid=r(),this.isMaterial=!0,this.name="",this.type="Material"}function Qt(e){Be.call(this,e),this.type="RawShaderMaterial",this.isRawShaderMaterial=!0}function Zt(){X.call(this),this.type="Light",this.color=new j(16777215),this.intensity=1}function $t(){Y.call(this),this.isVideoTexture=!0}function en(e,t,n,i){this.width=e,this.height=t,this.depth=n,this.data=i}function tn(e){return this.count=0,this.isInterleavedBuffer=!0,this.array=e.array,this.stride=e.stride,this.dynamic=!1,this.updateRange={offset:0,count:-1},this.version=0,this}function nn(e,t,n,i,r){this.isInterleavedBufferAttribute=!0,this.name="",this.data=e,this.itemSize=t,this.offset=n,this.normalized=void 0!==i&&i}function rn(){Y.call(this),this.isFramebufferTexture=!0}function on(){function e(){}e.prototype.isLoader=!0,e.prototype.load=function(e,t,n,i){console.error("THREE.Loader: .load() has been deprecated. Use .loadAsync() instead.")},e.prototype.loadAsync=function(e,t){var n=this;return new Promise(function(i,r){n.load(e,i,t,r)})},e.prototype.parse=function(e){console.error("THREE.Loader: .parse() has been deprecated. Use .parseAsync() instead.")},e.prototype.parseAsync=function(e,t){var n=this;return new Promise(function(i,r){n.parse(e,i,t,r)})},e.prototype.setPath=function(e){return this.path=e,this},e.prototype.setResourcePath=function(e){return this.resourcePath=e,this},e.prototype.setCrossOrigin=function(e){return this.crossOrigin=e,this},this.manager=void 0!==on.DEFAULT_MANAGER?on.DEFAULT_MANAGER:new sn,this.path="",this.resourcePath="",this.crossOrigin="anonymous"}function an(e,t,n,i,r,o,a,s){this.isWebGLRenderTarget=!0,this.width=e,this.height=t,this.scissor=new A(0,0,e,t),this.scissorTest=!1,this.viewport=new A(0,0,e,t),this.texture=new ht(void 0,void 0,n,i,r,o,a,s),this.depthBuffer=!0,this.stencilBuffer=!0,this.depthTexture=null,this.samples=0}function sn(e,t,n){var i=this;this.onStart=void 0,this.onLoad=e,this.onProgress=t,this.onError=n,this.itemsLoaded=0,this.itemsTotal=0,this.urlModifier=void 0,this.isLoading=!1;var r={};this.addHandler=function(e,t){return r[e]=t,this},this.removeHandler=function(e){return delete r[e],this},this.getHandler=function(e){var t=e.match(/\.([a-z0-9]+)$/i);if(null!==t){var n=t[1].toLowerCase();return r[n]}return null},this.itemStart=function(e){this.itemsTotal++,!1===this.isLoading&&(this.onStart&&this.onStart(e,this.itemsLoaded,this.itemsTotal),this.isLoading=!0)},this.itemEnd=function(e){this.itemsLoaded++,this.onProgress&&this.onProgress(e,this.itemsLoaded,this.itemsTotal),this.itemsLoaded===this.itemsTotal&&(this.isLoading=!1,this.onLoad&&this.onLoad())},this.itemError=function(e){this.onError&&this.onError(e)},this.resolveURL=function(e){return this.urlModifier?this.urlModifier(e):e},this.setURLModifier=function(e){return this.urlModifier=e,this}}function ln(e){sn.call(this);var t=this;this.withCredentials=!1,this.load=function(e,n,i,r){void 0===n&&console.warn('THREE.FileLoader: "onLoad" callback is not defined.'),void 0===i&&(i=function(){}),void 0===r&&(r=function(){});var o=this.manager.getHandler(e);null===o&&(o=new ln(this.manager)),o.setPath(this.path),o.setResponseType(this.responseType),o.setWithCredentials(this.withCredentials),o.load(e,n,i,r)}}function cn(e){sn.call(this);var t=this;this.load=function(e,n,i,r){void 0===n&&console.warn('THREE.ImageLoader: "onLoad" callback is not defined');var o=document.createElementNS("http://www.w3.org/1999/xhtml","img");function a(){o.removeEventListener("load",a,!1),o.removeEventListener("error",s,!1),n(this)}function s(e){o.removeEventListener("load",a,!1),o.removeEventListener("error",s,!1),r&&r(e)}return o.addEventListener("load",a,!1),o.addEventListener("error",s,!1),e=this.manager.resolveURL(e),this.crossOrigin&&"anonymous"!==this.crossOrigin&&(e.match(/^data:/)||(o.crossOrigin=this.crossOrigin)),o.src=e,o},this.setCrossOrigin=function(e){return t.crossOrigin=e,this}}function un(e){sn.call(this);var t=this;this.load=function(e,n,i,r){void 0===n&&console.warn('THREE.ImageBitmapLoader: "onLoad" callback is not defined');var o={};void 0!==this.options&&Object.assign(o,this.options);var a=this.manager.resolveURL(e);return fetch(a).then(function(e){return e.blob()}).then(function(e){return createImageBitmap(e,o)}).then(function(e){n(e)}).catch(function(e){r(e)})},this.setOptions=function(e){return t.options=e,this}}function hn(e){sn.call(this);var t=this,n=new cn(this.manager);this.load=function(e,i,r,o){n.setPath(t.path),n.setCrossOrigin(t.crossOrigin),n.load(e,function(e){var t=new ht;t.image=e,t.needsUpdate=!0,void 0!==i&&i(t)},r,o)}}function pn(e){var t=this,n=[],i=null,r=null,o={};this.extensions={},this.capabilities={},this.isWebGL2=!1,this.getContext=function(){return e},this.getAttributes=function(){return o},this.getExtension=function(e){if(void 0!==this.extensions[e])return this.extensions[e];switch(e){case"WEBGL_depth_texture":i=i||this.getContext().getExtension("WEBGL_depth_texture")||this.getContext().getExtension("MOZ_WEBGL_depth_texture")||this.getContext().getExtension("WEBKIT_WEBGL_depth_texture");break;case"EXT_texture_filter_anisotropic":i=i||this.getContext().getExtension("EXT_texture_filter_anisotropic")||this.getContext().getExtension("MOZ_EXT_texture_filter_anisotropic")||this.getContext().getExtension("WEBKIT_EXT_texture_filter_anisotropic");break;case"WEBGL_compressed_texture_s3tc":i=i||this.getContext().getExtension("WEBGL_compressed_texture_s3tc")||this.getContext().getExtension("MOZ_WEBGL_compressed_texture_s3tc")||this.getContext().getExtension("WEBKIT_WEBGL_compressed_texture_s3tc");break;case"WEBGL_compressed_texture_pvrtc":i=i||this.getContext().getExtension("WEBGL_compressed_texture_pvrtc")||this.getContext().getExtension("WEBKIT_WEBGL_compressed_texture_pvrtc");break;case"WEBGL_compressed_texture_etc1":i=i||this.getContext().getExtension("WEBGL_compressed_texture_etc1");break;case"WEBGL_compressed_texture_astc":i=i||this.getContext().getExtension("WEBGL_compressed_texture_astc");break;case"WEBGL_draw_buffers":i=i||this.getContext().getExtension("WEBGL_draw_buffers");break;case"EXT_color_buffer_half_float":i=i||this.getContext().getExtension("EXT_color_buffer_half_float");break;case"WEBGL_color_buffer_float":i=i||this.getContext().getExtension("WEBGL_color_buffer_float");break;case"EXT_shader_texture_lod":i=i||this.getContext().getExtension("EXT_shader_texture_lod");break;case"OES_texture_float":i=i||this.getContext().getExtension("OES_texture_float");break;case"OES_texture_float_linear":i=i||this.getContext().getExtension("OES_texture_float_linear");break;case"OES_texture_half_float":i=i||this.getContext().getExtension("OES_texture_half_float");break;case"OES_texture_half_float_linear":i=i||this.getContext().getExtension("OES_texture_half_float_linear");break;case"OES_standard_derivatives":i=i||this.getContext().getExtension("OES_standard_derivatives");break;case"ANGLE_instanced_arrays":i=i||this.getContext().getExtension("ANGLE_instanced_arrays");break;case"OES_element_index_uint":i=i||this.getContext().getExtension("OES_element_index_uint");break;case"EXT_frag_depth":i=i||this.getContext().getExtension("EXT_frag_depth");break;case"EXT_blend_minmax":i=i||this.getContext().getExtension("EXT_blend_minmax");break;case"EXT_color_buffer_float":i=i||this.getContext().getExtension("EXT_color_buffer_float");break;case"EXT_disjoint_timer_query":i=i||this.getContext().getExtension("EXT_disjoint_timer_query");break;default:i=this.getContext().getExtension(e)}return this.extensions[e]=i,i},this.getMaxAnisotropy=function(){if(void 0!==this.capabilities.maxAnisotropy)return this.capabilities.maxAnisotropy;var e=this.getExtension("EXT_texture_filter_anisotropic");return null!==e?this.capabilities.maxAnisotropy=this.getContext().getParameter(e.MAX_TEXTURE_MAX_ANISOTROPY_EXT):this.capabilities.maxAnisotropy=0,this.capabilities.maxAnisotropy},this.getMaxPrecision=function(e){if(void 0!==this.capabilities.maxPrecision)return this.capabilities.maxPrecision;if("highp"===e){if(this.getContext().getShaderPrecisionFormat(35633,36338).precision>0&&this.getContext().getShaderPrecisionFormat(35632,36338).precision>0)return this.capabilities.maxPrecision="highp"}return e="mediump","mediump"===e?(this.getContext().getShaderPrecisionFormat(35633,36337).precision>0&&this.getContext().getShaderPrecisionFormat(35632,36337).precision>0?this.capabilities.maxPrecision="mediump":this.capabilities.maxPrecision="lowp"):"lowp"===e?this.capabilities.maxPrecision="lowp":void 0},this.isBufferFloat=function(){return null!==(r=r||this.getExtension("WEBGL_color_buffer_float"))},this.maxTextures=function(){return this.capabilities.maxTextures||(this.capabilities.maxTextures=this.getContext().getParameter(3379)),this.capabilities.maxTextures},this.maxVertexTextures=function(){return this.capabilities.maxVertexTextures||(this.capabilities.maxVertexTextures=this.getContext().getParameter(35660)),this.capabilities.maxVertexTextures},this.maxTextureSize=function(){return this.capabilities.maxTextureSize||(this.capabilities.maxTextureSize=this.getContext().getParameter(3379)),this.capabilities.maxTextureSize},this.maxCubemapSize=function(){return this.capabilities.maxCubemapSize||(this.capabilities.maxCubemapSize=this.getContext().getParameter(34076)),this.capabilities.maxCubemapSize},this.maxAttributes=function(){return this.capabilities.maxAttributes||(this.capabilities.maxAttributes=this.getContext().getParameter(34921)),this.capabilities.maxAttributes},this.maxVertexUniforms=function(){return this.capabilities.maxVertexUniforms||(this.capabilities.maxVertexUniforms=this.getContext().getParameter(36347)),this.capabilities.maxVertexUniforms},this.maxVaryings=function(){return this.capabilities.maxVaryings||(this.capabilities.maxVaryings=this.getContext().getParameter(36348)),this.capabilities.maxVaryings},this.maxFragmentUniforms=function(){return this.capabilities.maxFragmentUniforms||(this.capabilities.maxFragmentUniforms=this.getContext().getParameter(36349)),this.capabilities.maxFragmentUniforms},this.isTextureFloat=function(){return null!==(n=n||this.getExtension("OES_texture_float"))},this.isTextureHalfFloat=function(){return null!==(n=n||this.getExtension("OES_texture_half_float"))}}function dn(e,t,n,i){function r(){return s}function o(e,t){return a(e,t)}function a(e,t){var n=e.id;if(null==t){var r=s.get(n);void 0!==r&&r.dispose(),s.delete(n)}else if(void 0===s.get(n)){var o=new ci(e,t);s.set(n,o)}}var s=new Map}function fn(e,t,n,i){function r(e){var t=d.get(e);return void 0===t&&(t={},d.set(e,t)),t}function o(e){s(e),p.delete(e.uuid)}function a(e){var t=e.array,n=e.usage;if(void 0===n)switch(!0){case e.isFloat32BufferAttribute:case e.isFloat64BufferAttribute:n=35048;break;case e.isUint16BufferAttribute:case e.isUint32BufferAttribute:n=35044;break;default:n=35044}var i=l(),r=f(e);null==r&&(r=l());var o=t.createBuffer();l().bindBuffer(34962,o),l().bufferData(34962,t,n);var a=g(e);null==a&&(a=0),f(e,o),c(e,n),u(e,t.byteLength),h(e,a),p.set(e.uuid,e)}function s(e){var t=f(e);t&&(l().deleteBuffer(t),m(e))}function l(){return i.getContext()}function c(e,t){r(e).usage=t}function u(e,t){r(e).bytes=t}function h(e,t){r(e).updateRanges.push({start:0,count:t})}function p(t,n,i){l().bindBuffer(34962,f(t)),l().bufferSubData(34962,n,i)}function d(n){l().bindBuffer(34963,n),r(n).boundTo=34963}function f(e){return r(e).buffer}function m(e){r(e).buffer=null}function g(e){return r(e).version}function y(e,t){r(e).version=t}function v(e,t){r(e).usage=t}function b(e,t,n){r(e).updateRanges.push({start:t,count:n})}function _(){p.clear(),d.clear()}var p=new Map,d=new Map}function mn(e,t,n){function i(i,o,a,s){var l=r(i);l.version=i.version,l.hash===o&&l.program===s&&l.usedTimes++||(l.hash=o,l.program=s,l.usedTimes=1,e.uniform1i(a,s),n.setTexture2D(i,s))}function r(e){var n=s.get(e);return void 0===n&&(n={},s.set(e,n)),n}function o(){s.clear()}function a(){for(var e of s.entries()){var n=e[1];n.usedTimes=0,n.program=null}}var s=new Map}function gn(e,t,n){function i(e){var n=o.get(e);return void 0===n&&(n=new mn(t,0,0),o.set(e,n)),n}var r=e.getContext(),o=new Map}function yn(e){var t=new WeakMap,n={};function i(e,i){var r=t.get(e);return void 0===r&&(r=new Map,t.set(e,r)),void 0===r.get(i)&&(r.set(i,function(e,t){var i=e.getContext(),r=i.createProgram(),o=i.createShader(35633),a=i.createShader(35632),s=t.get("vertexShader"),l=t.get("fragmentShader"),c=t.get("defines"),u=t.get("customExtensions"),h={};if(void 0!==c)for(var p in c){var d=c[p];!1!==d&&(h[p]=void 0===d||null===d?"":d)}var f=e.getShader(i,s,h,35633,u),m=e.getShader(i,l,h,35632,u);if(i.attachShader(r,f),i.attachShader(r,m),i.linkProgram(r),e.programLinked(r)){var g=function(e,t){for(var n=0,i=e.getProgramParameter(t,35722);n<i;n++){var r=e.getActiveAttrib(t,n);h[r.name]={type:r.type,location:e.getAttribLocation(t,r.name)}}return h}(i,r),y=function(e,t){for(var n={},i=0,r=e.getProgramParameter(t,35718);i<r;i++){var o=e.getActiveUniform(t,i),a=o.name,s=e.getUniformLocation(t,a);n[a]={type:o.type,size:o.size,location:s,value:void 0}}return n}(i,r);n[t.id]={program:r,vertexShader:f,fragmentShader:a,attributes:g,uniforms:y},i.deleteShader(f),i.deleteShader(m)}return r}(e,i)),i.useProgram(r.get(i)),n[i.id].program)},i.programLinked=function(e){return n[e.id].getProgramParameter(e,35714)},i.getShader=function(e,t,n,i,r){var o=n.split("\n"),a=0;for(var s in t){var l=o[a].match(/#define GL_FRAGMENT_PRECISION_HIGH/);l&&s++}var c,u="";if(void 0!==r)for(c=0;c<r.length;c++)u+="#extension "+r[c]+" : enable\n";for(c in n)u+="#define "+c+" "+n[c]+"\n";var h=i===this.VERTEX_SHADER?this.vertexShaderPrefix:this.fragmentShaderPrefix,p=[u,h,t].join("\n");return e.shaderSource(o,p),e.compileShader(o),o},this}function vn(e){this.program=null,this.vertexShader=null,this.fragmentShader=null,this.usedTimes=1,this.uniforms=null,this.attributes=null;var t=e.getContext();this.getUniforms=function(){return void 0===this.uniforms&&(this.uniforms=new ai(t,this.program)),this.uniforms},this.getAttributes=function(){return void 0===this.attributes&&(this.attributes=function(e,t){var n={},i=e.getProgramParameter(t,35722);for(var r=0;r<i;r++){var o=e.getActiveAttrib(t,r),a=o.name;n[a]=e.getAttribLocation(t,a)}return n}(t,this.program)),this.attributes},this.destroy=function(){t.deleteProgram(this.program),this.program=void 0},this}function bn(){var e,t={},n=0,i=0;return{allocate:function(r){t[r.id]?e=t[r.id]:(e=new vn(r),t[r.id]=e,n++,i++),e.usedTimes++;var o=new li(e.program,r.getContext(),r.state);return o},release:function(r){var o=r.program;e=t[o.id],e.usedTimes--,0===e.usedTimes&&(e.destroy(),delete t[o.id],i--,n--)},get programs(){return t},get allocated(){return i},get acquired(){return n}}}function _n(e){this.isWebGLShadowMap=!0,this._renderer=e,this._enabled=!1,this._autoUpdate=!0,this._needsUpdate=!1,this._type=1,this.enabled=!1,this.autoUpdate=!0,this.needsUpdate=!1,this.type=1,this._frustum=new W,this._projScreenMatrix=new I,this._lightPositionWorld=new T,this._lookTarget=new T,this._maxTextureSize=e.capabilities.maxTextureSize}function wn(e,t){Fe.call(this),this.type="AmbientLightProbe",this.sh=void 0!==e?e.clone():new wn,this.intensity=void 0!==t?t:1}function Sn(e,t){X.call(this),this.type="DirectionalLightShadow",this.camera=new ke(-5,5,5,-5,.5,500),this.bias=0,this.radius=1,this.mapSize=new C(512,512),Fe.call(this,e,t)}function xn(e,t){X.call(this),this.type="PointLightShadow",this.camera=new Le(90,1,.5,500),this.bias=0,this.radius=1,this.mapSize=new C(512,512),this.updateMatrices=function(e){var t=this.camera,n=this._cubeDirections,i=this._cubeUps;for(var r=0;r<6;r++)this._lookTarget.copy(e.position).add(n[r]),t.up.copy(i[r]),t.lookAt(this._lookTarget),t.updateMatrixWorld(),this._lightMatrices[r].copy(t.projectionMatrix).multiply(t.matrixWorldInverse)},this._lookTarget=new T,this._lightPositionWorld=new T,this._projScreenMatrix=new I,this._cubeDirections=[new T(1,0,0),new T(-1,0,0),new T(0,1,0),new T(0,-1,0),new T(0,0,1),new T(0,0,-1)],this._cubeUps=[new T(0,-1,0),new T(0,-1,0),new T(0,0,1),new T(0,0,-1),new T(0,-1,0),new T(0,-1,0)],this._lightMatrices=function(e){for(var t=[],n=0;n<e;n++)t.push(new I);return t}(6),Fe.call(this,e,t)}function En(){return[new Float32Array([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,1,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,-3,-3,1,3,-3,1,3,-3,1,3,-3,1,3,-3,1,3,-3,1,3,-3,1,3,-3,1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,1,3,-1,1,3,-1,1,3,-1,1,3,-1,1,3,-1,1,3,-1,1,3,-1,1,3,-1,3,1,1,3,1,1,3,1,1,3,1,1,3,1,1,3,1,1,3,1,1,3,1,1]),new Float32Array([1,1,1,1,1,1,1,1,1,1,1,1,-3,3,-1,-3,3,-1,-3,3,-1,-3,3,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,-1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,-3,-1,3,-3,-1,3,-3,-1,3,-3,-1,3,3,-3,1,3,-3,1,3,-3,1,3,-3,1,-3,1,-1,-3,1,-1,-3,1,-1,-3,1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,1,-1,1,1,-1,1,1,-1,1,1,-1,-1,-3,-1,-1,-3,-1,-1,-3,-1,-1,-3,-1,3,1,-1,3,1,-1,3,1,-1,3,1,-1,-3,-3,-1,-3,-3,-1,-3,-3,-1,-3,-3,-1]),new Float32Array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,3,-1,3,3,-1,3,3,-1,3,3,1,1,-1,1,1,-1,1,1,-1,1,1,-1,-1,-1,3,-1,-1,3,-1,-1,3,-1,-1,3,3,1,-3,3,1,-3,3,1,-3,3,1,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-1,-1,3,-1,-1,3,-1,-1,3,-1,-1,3,1,-3,1,1,-3,1,1,-3,1,1,-3,1,3,-1,-1,3,-1,-1,3,-1,-1,3,-1,-1,3,3,3,3,3,3,3,3,3,3,3,3]),new Float32Array([-1,-1,-1,-1,-1,-1,3,3,-1,3,3,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,1,1,-3,-1,3,-3,-1,3,1,1,-1,1,1,-1,3,3,-3,3,3,-3,1,1,-1,1,1,-1,3,3,-3,3,3,-3,-3,-1,3,-3,-1,3,-1,1,-3,-1,1,-3,-1,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1,-3,-3,-1,-3,-3,-1,-1,-1,-3,-1,-1,-3,1,1,1,1,1,1]),new Float32Array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,--1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,--1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,--1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,--3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,--3,-...
+    </script>
+    <script>
+        // --- Inlined OrbitControls.js for r128 ---
+        /**
+ * @author qiao / https://github.com/qiao
+ * @author mrdoob / http://mrdoob.com
+ * @author alteredq / http://alteredqualia.com/
+ * @author WestLangley / http://github.com/WestLangley
+ * @author erichlof / http://erichlof.com
+ */
+
+THREE.OrbitControls = function ( object, domElement ) {
+
+	this.object = object;
+
+	this.domElement = ( domElement !== undefined ) ? domElement : document;
+
+	// Set to false to disable this control
+	this.enabled = true;
+
+	// "target" sets the location of focus, where the object orbits around
+	this.target = new THREE.Vector3();
+
+	// How far you can dolly in and out ( PerspectiveCamera only )
+	this.minDistance = 0;
+	this.maxDistance = Infinity;
+
+	// How far you can zoom in and out ( OrthographicCamera only )
+	this.minZoom = 0;
+	this.maxZoom = Infinity;
+
+	// How far you can orbit vertically, upper and lower limits.
+	// Range is 0 to Math.PI radians.
+	this.minPolarAngle = 0; // radians
+	this.maxPolarAngle = Math.PI; // radians
+
+	// How far you can orbit horizontally, upper and lower limits.
+	// If set, must be a sub-interval of the interval [ - Math.PI, Math.PI ].
+	this.minAzimuthAngle = - Infinity; // radians
+	this.maxAzimuthAngle = Infinity; // radians
+
+	// Set to true to enable damping (inertia)
+	// If damping is enabled, you must call controls.update() in your animation loop
+	this.enableDamping = false;
+	this.dampingFactor = 0.25;
+
+	// This option actually enables dollying in and out; left as "zoom" for backwards compatibility.
+	// Set to false to disable zooming
+	this.enableZoom = true;
+	this.zoomSpeed = 1.0;
+
+	// Set to false to disable rotating
+	this.enableRotate = true;
+	this.rotateSpeed = 1.0;
+
+	// Set to false to disable panning
+	this.enablePan = true;
+	this.panSpeed = 1.0;
+	this.screenSpacePanning = false; // if true, pan in screen-space
+	this.keyPanSpeed = 7.0;	// pixels moved per arrow key push
+
+	// Set to true to automatically rotate around the target
+	// If auto-rotate is enabled, you must call controls.update() in your animation loop
+	this.autoRotate = false;
+	this.autoRotateSpeed = 2.0; // 30 seconds per round when fps is 60
+
+	// Set to false to disable use of the keys
+	this.enableKeys = true;
+
+	// The four arrow keys
+	this.keys = { LEFT: 37, UP: 38, RIGHT: 39, BOTTOM: 40 };
+
+	// Mouse buttons
+	this.mouseButtons = { ORBIT: THREE.MOUSE.LEFT, ZOOM: THREE.MOUSE.MIDDLE, PAN: THREE.MOUSE.RIGHT };
+
+	// for reset
+	this.target0 = this.target.clone();
+	this.position0 = this.object.position.clone();
+	this.zoom0 = this.object.zoom;
+
+	//
+	// public methods
+	//
+
+	this.getPolarAngle = function () {
+
+		return spherical.phi;
+
+	};
+
+	this.getAzimuthalAngle = function () {
+
+		return spherical.theta;
+
+	};
+
+	this.saveState = function () {
+
+		scope.target0.copy( scope.target );
+		scope.position0.copy( scope.object.position );
+		scope.zoom0 = scope.object.zoom;
+
+	};
+
+	this.reset = function () {
+
+		scope.target.copy( scope.target0 );
+		scope.object.position.copy( scope.position0 );
+		scope.object.zoom = scope.zoom0;
+
+		scope.object.updateProjectionMatrix();
+		scope.dispatchEvent( changeEvent );
+
+		scope.update();
+
+		state = STATE.NONE;
+
+	};
+
+	// this method is exposed, but perhaps it would be better if we can make it private...
+	this.update = function () {
+
+		var offset = new THREE.Vector3();
+
+		// so camera.up is the orbit axis
+		var quat = new THREE.Quaternion().setFromUnitVectors( object.up, new THREE.Vector3( 0, 1, 0 ) );
+		var quatInverse = quat.clone().inverse();
+
+		var lastPosition = new THREE.Vector3();
+		var lastQuaternion = new THREE.Quaternion();
+
+		return function update() {
+
+			var position = scope.object.position;
+
+			offset.copy( position ).sub( scope.target );
+
+			// rotate offset to "y-axis-is-up" space
+			offset.applyQuaternion( quat );
+
+			// angle from z-axis around y-axis
+			spherical.setFromVector3( offset );
+
+			if ( scope.autoRotate && state === STATE.NONE ) {
+
+				rotateLeft( getAutoRotationAngle() );
+
+			}
+
+			spherical.theta += sphericalDelta.theta;
+			spherical.phi += sphericalDelta.phi;
+
+			// restrict theta to be between desired limits
+			spherical.theta = Math.max( scope.minAzimuthAngle, Math.min( scope.maxAzimuthAngle, spherical.theta ) );
+
+			// restrict phi to be between desired limits
+			spherical.phi = Math.max( scope.minPolarAngle, Math.min( scope.maxPolarAngle, spherical.phi ) );
+
+			spherical.makeSafe();
+
+
+			spherical.radius *= scale;
+
+			// restrict radius to be between desired limits
+			spherical.radius = Math.max( scope.minDistance, Math.min( scope.maxDistance, spherical.radius ) );
+
+			// move target to panned location
+			scope.target.add( panOffset );
+
+			offset.setFromSpherical( spherical );
+
+			// rotate offset back to "camera-up-vector-is-up" space
+			offset.applyQuaternion( quatInverse );
+
+			position.copy( scope.target ).add( offset );
+
+			scope.object.lookAt( scope.target );
+
+			if ( scope.enableDamping === true ) {
+
+				sphericalDelta.theta *= ( 1 - scope.dampingFactor );
+				sphericalDelta.phi *= ( 1 - scope.dampingFactor );
+
+				panOffset.multiplyScalar( 1 - scope.dampingFactor );
+
+			} else {
+
+				sphericalDelta.set( 0, 0, 0 );
+
+				panOffset.set( 0, 0, 0 );
+
+			}
+
+			scale = 1;
+
+			// update condition is:
+			// min(camera displacement, camera rotation in radians)^2 > EPS
+			// using small-angle approximation cos(x) ~ 1 - x^2 / 2
+
+			if ( zoomChanged ||
+				lastPosition.distanceToSquared( scope.object.position ) > EPS ||
+				8 * ( 1 - lastQuaternion.dot( scope.object.quaternion ) ) > EPS ) {
+
+				scope.dispatchEvent( changeEvent );
+
+				lastPosition.copy( scope.object.position );
+				lastQuaternion.copy( scope.object.quaternion );
+				zoomChanged = false;
+
+				return true;
+
+			}
+
+			return false;
+
+		};
+
+	}();
+
+	this.dispose = function () {
+
+		scope.domElement.removeEventListener( 'contextmenu', onContextMenu, false );
+		scope.domElement.removeEventListener( 'mousedown', onMouseDown, false );
+		scope.domElement.removeEventListener( 'wheel', onMouseWheel, false );
+
+		scope.domElement.removeEventListener( 'touchstart', onTouchStart, false );
+		scope.domElement.removeEventListener( 'touchend', onTouchEnd, false );
+		scope.domElement.removeEventListener( 'touchmove', onTouchMove, false );
+
+		document.removeEventListener( 'mousemove', onMouseMove, false );
+		document.removeEventListener( 'mouseup', onMouseUp, false );
+
+		window.removeEventListener( 'keydown', onKeyDown, false );
+
+		//scope.dispatchEvent( { type: 'dispose' } ); // should this be added here?
+
+	};
+
+	//
+	// internals
+	//
+
+	var scope = this;
+
+	var changeEvent = { type: 'change' };
+	var startEvent = { type: 'start' };
+	var endEvent = { type: 'end' };
+
+	var STATE = { NONE: - 1, ROTATE: 0, DOLLY: 1, PAN: 2, TOUCH_ROTATE: 3, TOUCH_DOLLY_PAN: 4 };
+
+	var state = STATE.NONE;
+
+	var EPS = 0.000001;
+
+	// current position in spherical coordinates
+	var spherical = new THREE.Spherical();
+	var sphericalDelta = new THREE.Spherical();
+
+	var scale = 1;
+	var panOffset = new THREE.Vector3();
+	var zoomChanged = false;
+
+	var rotateStart = new THREE.Vector2();
+	var rotateEnd = new THREE.Vector2();
+	var rotateDelta = new THREE.Vector2();
+
+	var panStart = new THREE.Vector2();
+	var panEnd = new THREE.Vector2();
+	var panDelta = new THREE.Vector2();
+
+	var dollyStart = new THREE.Vector2();
+	var dollyEnd = new THREE.Vector2();
+	var dollyDelta = new THREE.Vector2();
+
+	function getAutoRotationAngle() {
+
+		return 2 * Math.PI / 60 / 60 * scope.autoRotateSpeed;
+
+	}
+
+	function getZoomScale() {
+
+		return Math.pow( 0.95, scope.zoomSpeed );
+
+	}
+
+	function rotateLeft( angle ) {
+
+		sphericalDelta.theta -= angle;
+
+	}
+
+	function rotateUp( angle ) {
+
+		sphericalDelta.phi -= angle;
+
+	}
+
+	var panLeft = function () {
+
+		var v = new THREE.Vector3();
+
+		return function panLeft( distance, objectMatrix ) {
+
+			v.setFromMatrixColumn( objectMatrix, 0 ); // get X column of objectMatrix
+			v.multiplyScalar( - distance );
+
+			panOffset.add( v );
+
+		};
+
+	}();
+
+	var panUp = function () {
+
+		var v = new THREE.Vector3();
+
+		return function panUp( distance, objectMatrix ) {
+
+			if ( scope.screenSpacePanning === true ) {
+
+				v.setFromMatrixColumn( objectMatrix, 1 );
+
+			} else {
+
+				v.setFromMatrixColumn( objectMatrix, 0 );
+				v.crossVectors( scope.object.up, v );
+
+			}
+
+			v.multiplyScalar( distance );
+
+			panOffset.add( v );
+
+		};
+
+	}();
+
+	// deltaX and deltaY are in pixels; right and down are positive
+	var pan = function () {
+
+		var offset = new THREE.Vector3();
+
+		return function pan( deltaX, deltaY ) {
+
+			var element = scope.domElement === document ? scope.domElement.body : scope.domElement;
+
+			if ( scope.object.isPerspectiveCamera ) {
+
+				// perspective
+				var position = scope.object.position;
+				offset.copy( position ).sub( scope.target );
+				var targetDistance = offset.length();
+
+				// half of the fov is center to top of screen
+				targetDistance *= Math.tan( ( scope.object.fov / 2 ) * Math.PI / 180.0 );
+
+				// we use only clientHeight here so aspect ratio does not distort speed
+				panLeft( 2 * deltaX * targetDistance / element.clientHeight, scope.object.matrix );
+				panUp( 2 * deltaY * targetDistance / element.clientHeight, scope.object.matrix );
+
+			} else if ( scope.object.isOrthographicCamera ) {
+
+				// orthographic
+				panLeft( deltaX * ( scope.object.right - scope.object.left ) / scope.object.zoom / element.clientWidth, scope.object.matrix );
+				panUp( deltaY * ( scope.object.top - scope.object.bottom ) / scope.object.zoom / element.clientHeight, scope.object.matrix );
+
+			} else {
+
+				// camera neither orthographic nor perspective
+				console.warn( 'WARNING: OrbitControls.js encountered an unknown camera type - pan disabled.' );
+				scope.enablePan = false;
+
+			}
+
+		};
+
+	}();
+
+	function dollyIn( dollyScale ) {
+
+		if ( scope.object.isPerspectiveCamera ) {
+
+			scale /= dollyScale;
+
+		} else if ( scope.object.isOrthographicCamera ) {
+
+			scope.object.zoom = Math.max( scope.minZoom, Math.min( scope.maxZoom, scope.object.zoom * dollyScale ) );
+			scope.object.updateProjectionMatrix();
+			zoomChanged = true;
+
+		} else {
+
+			console.warn( 'WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled.' );
+			scope.enableZoom = false;
+
+		}
+
+	}
+
+	function dollyOut( dollyScale ) {
+
+		if ( scope.object.isPerspectiveCamera ) {
+
+			scale *= dollyScale;
+
+		} else if ( scope.object.isOrthographicCamera ) {
+
+			scope.object.zoom = Math.max( scope.minZoom, Math.min( scope.maxZoom, scope.object.zoom / dollyScale ) );
+			scope.object.updateProjectionMatrix();
+			zoomChanged = true;
+
+		} else {
+
+			console.warn( 'WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled.' );
+			scope.enableZoom = false;
+
+		}
+
+	}
+
+	//
+	// event callbacks - update the object state
+	//
+
+	function handleMouseDownRotate( event ) {
+
+		//console.log( 'handleMouseDownRotate' );
+
+		rotateStart.set( event.clientX, event.clientY );
+
+	}
+
+	function handleMouseDownDolly( event ) {
+
+		//console.log( 'handleMouseDownDolly' );
+
+		dollyStart.set( event.clientX, event.clientY );
+
+	}
+
+	function handleMouseDownPan( event ) {
+
+		//console.log( 'handleMouseDownPan' );
+
+		panStart.set( event.clientX, event.clientY );
+
+	}
+
+	function handleMouseMoveRotate( event ) {
+
+		//console.log( 'handleMouseMoveRotate' );
+
+		rotateEnd.set( event.clientX, event.clientY );
+
+		rotateDelta.subVectors( rotateEnd, rotateStart ).multiplyScalar( scope.rotateSpeed );
+
+		var element = scope.domElement === document ? scope.domElement.body : scope.domElement;
+
+		rotateLeft( 2 * Math.PI * rotateDelta.x / element.clientWidth ); // yes, height
+
+		rotateUp( 2 * Math.PI * rotateDelta.y / element.clientHeight );
+
+		rotateStart.copy( rotateEnd );
+
+		scope.update();
+
+	}
+
+	function handleMouseMoveDolly( event ) {
+
+		//console.log( 'handleMouseMoveDolly' );
+
+		dollyEnd.set( event.clientX, event.clientY );
+
+		dollyDelta.subVectors( dollyEnd, dollyStart );
+
+		if ( dollyDelta.y > 0 ) {
+
+			dollyIn( getZoomScale() );
+
+		} else if ( dollyDelta.y < 0 ) {
+
+			dollyOut( getZoomScale() );
+
+		}
+
+		dollyStart.copy( dollyEnd );
+
+		scope.update();
+
+	}
+
+	function handleMouseMovePan( event ) {
+
+		//console.log( 'handleMouseMovePan' );
+
+		panEnd.set( event.clientX, event.clientY );
+
+		panDelta.subVectors( panEnd, panStart ).multiplyScalar( scope.panSpeed );
+
+		pan( panDelta.x, panDelta.y );
+
+		panStart.copy( panEnd );
+
+		scope.update();
+
+	}
+
+	function handleMouseUp( event ) {
+
+		// console.log( 'handleMouseUp' );
+
+	}
+
+	function handleMouseWheel( event ) {
+
+		// console.log( 'handleMouseWheel' );
+
+		if ( event.deltaY < 0 ) {
+
+			dollyOut( getZoomScale() );
+
+		} else if ( event.deltaY > 0 ) {
+
+			dollyIn( getZoomScale() );
+
+		}
+
+		scope.update();
+
+	}
+
+	function handleKeyDown( event ) {
+
+		//console.log( 'handleKeyDown' );
+
+		switch ( event.keyCode ) {
+
+			case scope.keys.UP:
+				pan( 0, scope.keyPanSpeed );
+				scope.update();
+				break;
+
+			case scope.keys.BOTTOM:
+				pan( 0, - scope.keyPanSpeed );
+				scope.update();
+				break;
+
+			case scope.keys.LEFT:
+				pan( scope.keyPanSpeed, 0 );
+				scope.update();
+				break;
+
+			case scope.keys.RIGHT:
+				pan( - scope.keyPanSpeed, 0 );
+				scope.update();
+				break;
+
+		}
+
+	}
+
+	function handleTouchStartRotate( event ) {
+
+		//console.log( 'handleTouchStartRotate' );
+
+		rotateStart.set( event.touches[ 0 ].pageX, event.touches[ 0 ].pageY );
+
+	}
+
+	function handleTouchStartDollyPan( event ) {
+
+		//console.log( 'handleTouchStartDollyPan' );
+
+		if ( scope.enableZoom ) {
+
+			var dx = event.touches[ 0 ].pageX - event.touches[ 1 ].pageX;
+			var dy = event.touches[ 0 ].pageY - event.touches[ 1 ].pageY;
+
+			var distance = Math.sqrt( dx * dx + dy * dy );
+
+			dollyStart.set( 0, distance );
+
+<script type="module" src="/index.tsx"></script>
