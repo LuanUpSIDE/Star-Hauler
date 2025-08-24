@@ -806,29 +806,39 @@ const App: React.FC = () => {
       const { player, universe, contracts, ships } = gameState;
       const currentShip = ships.find(s => s.id === player.currentShipId)!;
 
-      if (activePanel === 'planet' && selectedPlanet) {
-          if (selectedPlanet.id !== player.currentPlanetId) {
-              newFocusableItems.push(handleTravelDirectly);
-              newFocusableItems.push(handleAddToRoute);
-          } else {
-              const currentShipInstance = player.ownedShips.find(s => s.shipId === player.currentShipId);
-              const currentFuel = currentShipInstance ? currentShipInstance.fuel : 0;
-              const fuelToBuy = currentShip.fuelCapacity - currentFuel;
-              const fuelCost = Math.round(fuelToBuy * 1.5);
-              newFocusableItems.push(() => handleBuyFuel(fuelToBuy, fuelCost));
-              
-              const availableContracts = contracts[selectedPlanet.id] || [];
-              availableContracts.forEach(c => newFocusableItems.push(() => handleAcceptContract(c)));
-              
-              if (SHIPYARD_ECONOMIES.includes(selectedPlanet.economy)) {
-                const shipsForSaleFiltered = ships.filter(s => !player.ownedShips.some(os => os.shipId === s.id));
-                const ownedShipsFiltered = player.ownedShips.filter(s => s.shipId !== player.currentShipId);
-                
-                shipsForSaleFiltered.forEach(s => newFocusableItems.push(() => handleBuyShip(s)));
-                ownedShipsFiltered.forEach(s => newFocusableItems.push(() => handleSwitchShip(s.shipId)));
-              }
-          }
-      } else if (activePanel === 'manifest') {
+      // ...
+if (activePanel === 'planet' && selectedPlanet) {
+    if (selectedPlanet.id !== player.currentPlanetId) {
+        newFocusableItems.push(handleTravelDirectly);
+        newFocusableItems.push(handleAddToRoute);
+    } else {
+        // Ação de abastecer (sempre a primeira)
+        const currentShipInstance = player.ownedShips.find(s => s.shipId === player.currentShipId);
+        const currentFuel = currentShipInstance ? currentShipInstance.fuel : 0;
+        const fuelToBuy = currentShip.fuelCapacity - currentFuel;
+        const fuelCost = Math.round(fuelToBuy * 1.5);
+        newFocusableItems.push(() => handleBuyFuel(fuelToBuy, fuelCost));
+        
+        // Ações dos Contratos
+        const availableContracts = contracts[selectedPlanet.id] || [];
+        availableContracts.forEach(c => newFocusableItems.push(() => handleAcceptContract(c)));
+        
+        // Ações do Shipyard (Condicional)
+        if (SHIPYARD_ECONOMIES.includes(selectedPlanet.economy)) {
+          const shipsForSaleFiltered = ships.filter(s => !player.ownedShips.some(os => os.shipId === s.id));
+          shipsForSaleFiltered.forEach(s => newFocusableItems.push(() => handleBuyShip(s)));
+        }
+        
+        // Ações do Hangar (Sempre verificadas, assim como na UI)
+        const ownedShipsFiltered = player.ownedShips.filter(s => s.shipId !== player.currentShipId);
+        ownedShipsFiltered.forEach(ownedShip => {
+            const shipInfo = ships.find(s => s.id === ownedShip.shipId);
+            if (shipInfo) {
+                newFocusableItems.push(() => handleSwitchShip(shipInfo.id));
+            }
+        });
+    }
+} else if (activePanel === 'manifest') {
           player.cargo.forEach(c => newFocusableItems.push(() => handleCancelContract(c)));
       } else if (route.length > 0) {
           newFocusableItems.push(handleLaunch);
