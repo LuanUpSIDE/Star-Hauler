@@ -93,6 +93,10 @@ const App: React.FC = () => {
   const [cursorPosition, setCursorPosition] = useState<Point | null>(null);
   const [hoveredPlanetId, setHoveredPlanetId] = useState<number | null>(null);
   const [focusedItemIndex, setFocusedItemIndex] = useState<number>(0);
+  const focusedItemIndexRef = useRef(focusedItemIndex); // <-- ADICIONE ESTA LINHA
+useEffect(() => { // <-- ADICIONE ESTE BLOCO INTEIRO
+  focusedItemIndexRef.current = focusedItemIndex;
+}, [focusedItemIndex]);
   const buttonStates = useRef<Record<number, { pressed: boolean, triggered: boolean }>>({});
   const focusableItems = useRef<(() => void)[]>([]);
   const pauseTimeRef = useRef<number | null>(null);
@@ -671,18 +675,19 @@ const App: React.FC = () => {
             }
 
             if (isButtonTriggered(0)) { // A Button
-                if ((screen === 'MainMenu' || screen === 'Options' || screen === 'Paused') && focusableItems.current[focusedItemIndex]) {
-                    focusableItems.current[focusedItemIndex]();
-                } else if (screen === 'Playing') {
-                    if (activePanel !== null && focusableItems.current[focusedItemIndex]) {
-                        focusableItems.current[focusedItemIndex]();
-                    } else if (activePanel === null && hoveredPlanetId !== null) {
-                        handleSelectPlanet(hoveredPlanetId);
-                    } else if (activePanel === null && route.length > 0 && focusableItems.current[focusedItemIndex]) {
-                        focusableItems.current[focusedItemIndex]();
-                    }
-                }
-            }
+    const currentIndex = focusedItemIndexRef.current; // Usamos a referência para garantir o valor mais recente
+    if ((screen === 'MainMenu' || screen === 'Options' || screen === 'Paused') && focusableItems.current[currentIndex]) {
+        focusableItems.current[currentIndex]();
+    } else if (screen === 'Playing') {
+        if (activePanel !== null && focusableItems.current[currentIndex]) {
+            focusableItems.current[currentIndex]();
+        } else if (activePanel === null && hoveredPlanetId !== null) {
+            handleSelectPlanet(hoveredPlanetId);
+        } else if (activePanel === null && route.length > 0 && focusableItems.current[currentIndex]) {
+            focusableItems.current[currentIndex]();
+        }
+    }
+}
             if (isButtonTriggered(1)) { // B Button
                 if (screen === 'Options') handleBackFromOptions();
                 else if (screen === 'Paused') handleTogglePause();
