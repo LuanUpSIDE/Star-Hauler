@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+:root {
+    --primary-bg: #0A192F;
+    --primary-text: #E6F1FF;
+    --cyan: #00F6FF;
+}
+
+body {
+    font-family: 'Share Tech Mono', monospace;
+    background-color: var(--primary-bg);
+    color: var(--primary-text);
+    margin: 0;
+    overflow: hidden;
+}
+
+/* Estilos de Foco para Controle/Teclado */
+.controller-focus {
+    outline: 2px solid #FF7A00 !important;
+    box-shadow: 0 0 10px #FF7A00, 0 0 15px #FF7A00 !important;
+}
+.controller-focus-item {
+    outline: 2px solid #FF7A00 !important;
+    border-radius: 4px;
+}
+
+/* Outros estilos globais que você tinha */
+.neon-glow-cyan {
+    box-shadow: 0 0 5px rgba(0, 246, 255, 0.6), 0 0 10px rgba(0, 246, 255, 0.4), 0 0 15px rgba(0, 246, 255, 0.2);
+}
+
+.neon-text-cyan {
+    text-shadow: 0 0 5px rgba(0, 246, 255, 0.8), 0 0 8px rgba(0, 246, 255, 0.6);
+}
+
+.neon-text-orange {
+     text-shadow: 0 0 5px rgba(255, 122, 0, 0.8), 0 0 8px rgba(255, 122, 0, 0.6);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: #0A192F;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--cyan);
+    border-radius: 3px;
+    border: 1px solid #0A192F;
+}
+
+/* Animações que estavam no SVG/Componentes */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
