@@ -5,7 +5,7 @@ import { defineConfig } from "vite"
 export default defineConfig({
   plugins: [react()],
   // IMPORTANTE: Defina a base para o nome do seu repositório
-  base: "/https://github.com/LuanUpSIDE/Star-Hauler", 
+  base: "/Star-Hauler/", 
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
