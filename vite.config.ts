@@ -11,4 +11,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+<<<<<<< HEAD
 })
+=======
+})
+>>>>>>> a2ee27475d736902d3bfc785125b51fe1d9985b4
